@@ -16,8 +16,8 @@
   ],
   "author": "dathbe",
   "contributors": [
-    "dathbe",
-    "KristjanESPERANTO"
+    {"name": "dathbe"},
+    {"name": "KristjanESPERANTO"}
   ],
   "scripts": {
     "lint": "eslint",
