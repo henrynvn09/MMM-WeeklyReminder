@@ -4,7 +4,7 @@ Notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.11](https://github.com/dathbe/MMM-CustomText/compare/1.0.10...v1.0.11) - 2025-09-XX
+## [1.0.11](https://github.com/dathbe/MMM-CustomText/compare/1.0.10...v1.0.11) - 2026-01-04
 
 - Update automated-tests.yaml
 - Update readme for developers
