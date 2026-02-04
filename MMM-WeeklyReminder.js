@@ -14,6 +14,7 @@ Module.register('MMM-WeeklyReminder', {
     timezone: null,            // null = use system timezone
     reminders: [],             // Array of reminder objects
     debug: false,              // Enable debug logging
+    testMode: null,            // Test mode: { day: 'Tuesday', time: '15:30' }
   },
 
   // Define required scripts.
@@ -25,24 +26,46 @@ Module.register('MMM-WeeklyReminder', {
   start() {
     Log.info('Starting module: ' + this.name)
 
+    if (this.config.debug) {
+      Log.info(`[MMM-WeeklyReminder] Configuration:`, {
+        updateInterval: this.config.updateInterval,
+        timezone: this.config.timezone || 'system default',
+        reminderCount: this.config.reminders.length,
+        testMode: this.config.testMode || 'disabled',
+      })
+    }
+
     // Validate all reminders
     this.validReminders = this.config.reminders.filter(reminder => {
       return this.validateReminder(reminder)
     })
 
     if (this.config.debug) {
-      Log.info(`[MMM-WeeklyReminder] Loaded ${this.validReminders.length} valid reminders out of ${this.config.reminders.length}`)
+      Log.info(`[MMM-WeeklyReminder] Validated ${this.validReminders.length}/${this.config.reminders.length} reminders`)
+      this.validReminders.forEach(r => {
+        Log.info(`  - ${r.name}:`, r.showOn)
+      })
     }
 
     this.activeReminders = []
+    this.lastCheckTime = null
 
     // Initial check
     this.checkReminders()
 
-    // Set up periodic checking
+    // Set up periodic checking with error handling
     this.schedulerInterval = setInterval(() => {
-      this.checkReminders()
+      try {
+        this.checkReminders()
+      }
+      catch (error) {
+        Log.error(`[MMM-WeeklyReminder] Error in scheduler:`, error)
+      }
     }, this.config.updateInterval)
+
+    if (this.config.debug) {
+      Log.info(`[MMM-WeeklyReminder] Scheduler initialized, checking every ${this.config.updateInterval / 1000} seconds`)
+    }
   },
 
   /**
@@ -55,13 +78,63 @@ Module.register('MMM-WeeklyReminder', {
   },
 
   /**
+   * Called when module is hidden
+   */
+  suspend() {
+    if (this.config.debug) {
+      Log.info(`[MMM-WeeklyReminder] Module suspended, pausing scheduler`)
+    }
+    if (this.schedulerInterval) {
+      clearInterval(this.schedulerInterval)
+      this.schedulerInterval = null
+    }
+  },
+
+  /**
+   * Called when module is shown again
+   */
+  resume() {
+    if (this.config.debug) {
+      Log.info(`[MMM-WeeklyReminder] Module resumed, restarting scheduler`)
+    }
+
+    // Immediate check
+    this.checkReminders()
+
+    // Restart interval
+    this.schedulerInterval = setInterval(() => {
+      try {
+        this.checkReminders()
+      }
+      catch (error) {
+        Log.error(`[MMM-WeeklyReminder] Error in scheduler:`, error)
+      }
+    }, this.config.updateInterval)
+  },
+
+  /**
    * Checks all reminders and updates active reminder list
    */
   checkReminders() {
+    const now = this.getCurrentTime()
+    this.lastCheckTime = now
+
+    if (this.config.debug) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+      Log.info(`[MMM-WeeklyReminder] Checking reminders at ${dayNames[now.getDay()]} ${timeStr}`)
+    }
+
     const newActiveReminders = []
 
     for (const reminder of this.validReminders) {
-      if (this.isReminderActive(reminder)) {
+      const isActive = this.isReminderActive(reminder)
+
+      if (this.config.debug) {
+        Log.info(`  - "${reminder.name}": ${isActive ? 'ACTIVE' : 'inactive'}`)
+      }
+
+      if (isActive) {
         newActiveReminders.push(reminder)
       }
     }
@@ -74,6 +147,34 @@ Module.register('MMM-WeeklyReminder', {
       this.activeReminders = newActiveReminders
       this.updateDom(this.config.animationSpeed)
     }
+  },
+
+  /**
+   * Gets current date/time (real or simulated for testing)
+   * @returns {Date} - Current or simulated date
+   */
+  getCurrentTime() {
+    if (this.config.testMode) {
+      const now = new Date()
+      const testDay = this.dayNameToNumber(this.config.testMode.day)
+      const [hours, minutes] = this.config.testMode.time.split(':').map(Number)
+
+      // Calculate days to add to get to test day
+      let daysToAdd = testDay - now.getDay()
+      if (daysToAdd < 0) daysToAdd += 7
+
+      const testDate = new Date(now)
+      testDate.setDate(testDate.getDate() + daysToAdd)
+      testDate.setHours(hours, minutes, 0, 0)
+
+      if (this.config.debug) {
+        Log.info(`[MMM-WeeklyReminder] TEST MODE: Simulating ${this.config.testMode.day} ${this.config.testMode.time}`)
+      }
+
+      return testDate
+    }
+
+    return new Date()
   },
 
   /**
@@ -99,7 +200,7 @@ Module.register('MMM-WeeklyReminder', {
    * @returns {boolean} - True if currently active
    */
   isReminderActive(reminder) {
-    const now = new Date()
+    const now = this.getCurrentTime()
     const currentDay = now.getDay() // 0=Sunday, 6=Saturday
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
