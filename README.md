@@ -9,6 +9,7 @@ MMM-WeeklyReminder is a module for [MagicMirror²](https://github.com/MagicMirro
 - 🗓️ **Recurring Weekly Schedules** - Set reminders for specific days and times each week
 - ⏰ **Flexible Time Windows** - Support for all-day reminders or specific time ranges
 - 🌉 **Cross-Day Support** - Time windows can span across days (e.g., Wednesday 6 PM - Thursday 2 PM)
+- 🎉 **Holiday Exclusion** - Automatically suppress reminders when events fall on holidays
 - 📚 **Multiple Reminders** - Display multiple active reminders stacked vertically
 - 🎨 **HTML Support** - Use emojis, formatting, and custom HTML in your reminder messages
 - 🐛 **Debug Mode** - Built-in debugging for troubleshooting schedules
@@ -69,6 +70,7 @@ Add the module to your `~/MagicMirror/config/config.js` file:
 | `animationSpeed` | `number` | `2000` | Speed of transition animations (in milliseconds) when reminders appear/disappear. |
 | `timezone` | `string` | `null` | Timezone for schedule calculations. If `null`, uses system timezone. Example: `'America/Los_Angeles'` |
 | `reminders` | `Array` | `[]` | Array of reminder objects (see below) |
+| `holidays` | `Array` | `[]` | Array of holiday definitions for exclusion (see Holiday Exclusion section) |
 | `debug` | `boolean` | `false` | Enable debug logging to console for troubleshooting |
 | `testMode` | `Object` | `null` | Test mode configuration: `{ day: 'Tuesday', time: '15:30' }` to simulate a specific day/time |
 
@@ -81,6 +83,8 @@ Each reminder object has the following properties:
 | `name` | `string` | Yes | Unique name for the reminder (used for debugging) |
 | `message` | `string` | Yes | Message to display (supports HTML) |
 | `showOn` | `Object` | Yes | When to show the reminder (see formats below) |
+| `excludeHolidays` | `boolean` | No | If true, suppress reminder when event day is a holiday (default: false) |
+| `eventDay` | `string` | No | Day when actual event occurs (for holiday checking). Auto-detected if not specified. |
 
 ### ShowOn Formats
 
@@ -173,6 +177,181 @@ reminders: [
     }
   }
 ]
+```
+
+## Holiday Exclusion
+
+MMM-WeeklyReminder can automatically suppress reminders when the actual event occurs on a holiday (e.g., when trash collection or street cleaning is cancelled).
+
+### How It Works
+
+When you enable `excludeHolidays: true` on a reminder:
+1. The module determines which day the actual event occurs (`eventDay`)
+2. It checks if that calendar date is a configured holiday
+3. If yes, the entire notification window is suppressed
+
+**Important:** The reminder checks when the **event** happens, not when the notification shows. For example:
+- Trash notification shows Tuesday, but trash pickup is Wednesday
+- If Wednesday is a holiday → Tuesday notification is suppressed
+- Street cleaning notification shows Wed 6pm-Thu 2pm, event is Thursday
+- If Thursday is a holiday → Wed 6pm notification is suppressed
+
+### Configuration Example
+
+```js
+config: {
+  reminders: [
+    {
+      name: 'Trash Day',
+      message: '🗑️ Take out trash tonight!',
+      showOn: { day: 'Tuesday', allDay: true },
+      excludeHolidays: true,  // Enable holiday exclusion
+      eventDay: 'Wednesday'   // Actual trash pickup is Wednesday
+    },
+    {
+      name: 'Street Cleaning',
+      message: '🚧 Move car for street cleaning',
+      showOn: {
+        start: { day: 'Wednesday', time: '18:00' },
+        end: { day: 'Thursday', time: '14:00' }
+      },
+      excludeHolidays: true,  // Enable holiday exclusion
+      eventDay: 'Thursday'    // Street cleaning happens Thursday
+    }
+  ],
+  
+  // US Federal Holidays (copy this template)
+  holidays: [
+    { type: 'fixed', month: 1, day: 1, name: 'New Year\'s Day' },
+    { type: 'nthWeekday', month: 1, weekday: 1, nth: 3, name: 'Martin Luther King Jr. Day' },
+    { type: 'nthWeekday', month: 2, weekday: 1, nth: 3, name: 'Presidents\' Day' },
+    { type: 'nthWeekday', month: 5, weekday: 1, nth: -1, name: 'Memorial Day' },
+    { type: 'fixed', month: 6, day: 19, name: 'Juneteenth' },
+    { type: 'fixed', month: 7, day: 4, name: 'Independence Day' },
+    { type: 'nthWeekday', month: 9, weekday: 1, nth: 1, name: 'Labor Day' },
+    { type: 'nthWeekday', month: 10, weekday: 1, nth: 2, name: 'Columbus Day' },
+    { type: 'fixed', month: 11, day: 11, name: 'Veterans Day' },
+    { type: 'nthWeekday', month: 11, weekday: 4, nth: 4, name: 'Thanksgiving' },
+    { type: 'fixed', month: 12, day: 25, name: 'Christmas Day' }
+  ]
+}
+```
+
+### Holiday Types
+
+MMM-WeeklyReminder supports three types of holiday definitions:
+
+#### 1. Fixed Date
+For holidays that occur on the same date every year:
+
+```js
+{ type: 'fixed', month: 7, day: 4, name: 'Independence Day' }
+```
+
+**Fields:**
+- `month`: 1-12 (January = 1, December = 12)
+- `day`: 1-31
+- `name`: Holiday name (for debugging)
+
+#### 2. Nth Weekday
+For holidays like "3rd Monday of January":
+
+```js
+{ type: 'nthWeekday', month: 1, weekday: 1, nth: 3, name: 'MLK Day' }
+```
+
+**Fields:**
+- `month`: 1-12
+- `weekday`: 0-6 (Sunday = 0, Saturday = 6)
+- `nth`: 1-5 for "1st through 5th", or -1 for "last occurrence"
+- `name`: Holiday name
+
+**Examples:**
+- `nth: 1` - First Monday
+- `nth: 3` - Third Monday
+- `nth: -1` - Last Monday (Memorial Day)
+
+#### 3. Specific Date
+For one-time holidays or observed dates:
+
+```js
+{ type: 'date', date: '2026-07-03', name: 'Independence Day (Observed)' }
+```
+
+**Fields:**
+- `date`: YYYY-MM-DD format
+- `name`: Holiday name
+
+### Event Day Detection
+
+The `eventDay` field specifies when the actual event occurs:
+
+```js
+{
+  name: 'Trash Day',
+  showOn: { day: 'Tuesday', allDay: true },
+  excludeHolidays: true,
+  eventDay: 'Wednesday'  // Trash pickup is Wednesday, not Tuesday
+}
+```
+
+**Auto-Detection:** If `eventDay` is not specified:
+- All-day reminders: event day = reminder day
+- Time windows: event day = end day
+
+**Manual Specification:** For reminders that notify *before* the event (like trash day), explicitly set `eventDay`.
+
+### US Federal Holidays Template
+
+Copy this complete template for all 11 US federal holidays:
+
+```js
+holidays: [
+  // Fixed date holidays
+  { type: 'fixed', month: 1, day: 1, name: 'New Year\'s Day' },
+  { type: 'fixed', month: 6, day: 19, name: 'Juneteenth' },
+  { type: 'fixed', month: 7, day: 4, name: 'Independence Day' },
+  { type: 'fixed', month: 11, day: 11, name: 'Veterans Day' },
+  { type: 'fixed', month: 12, day: 25, name: 'Christmas Day' },
+  
+  // Nth weekday holidays
+  { type: 'nthWeekday', month: 1, weekday: 1, nth: 3, name: 'Martin Luther King Jr. Day' },    // 3rd Monday in January
+  { type: 'nthWeekday', month: 2, weekday: 1, nth: 3, name: 'Presidents\' Day' },              // 3rd Monday in February
+  { type: 'nthWeekday', month: 5, weekday: 1, nth: -1, name: 'Memorial Day' },                 // Last Monday in May
+  { type: 'nthWeekday', month: 9, weekday: 1, nth: 1, name: 'Labor Day' },                     // 1st Monday in September
+  { type: 'nthWeekday', month: 10, weekday: 1, nth: 2, name: 'Columbus Day' },                 // 2nd Monday in October
+  { type: 'nthWeekday', month: 11, weekday: 4, nth: 4, name: 'Thanksgiving' },                 // 4th Thursday in November
+]
+```
+
+### Adding Custom Holidays
+
+You can add local holidays, religious observances, or any other dates:
+
+```js
+holidays: [
+  // Add local/regional holidays
+  { type: 'nthWeekday', month: 4, weekday: 1, nth: 3, name: 'Patriots\' Day (MA/ME)' },
+  { type: 'fixed', month: 3, day: 2, name: 'Texas Independence Day' },
+  
+  // Add specific observed dates
+  { type: 'date', date: '2026-12-24', name: 'Christmas Eve (Office Closed)' },
+  { type: 'date', date: '2026-12-31', name: 'New Year\'s Eve (Office Closed)' }
+]
+```
+
+### Validation and Debugging
+
+- Invalid holidays are silently skipped with console warnings
+- Use `debug: true` to see holiday calculations
+- Holidays that don't exist (e.g., 5th Monday when only 4 exist) are skipped
+- Holiday cache is calculated once per year and reused
+
+**Debug Output Example:**
+```
+[MMM-WeeklyReminder] Calculated 11 holidays for 2026
+[MMM-WeeklyReminder] 2026-07-04 is a holiday: Independence Day
+[MMM-WeeklyReminder] Reminder "Trash Day": event day is Wednesday (2026-07-04), holiday exclusion: true
 ```
 
 ## Troubleshooting

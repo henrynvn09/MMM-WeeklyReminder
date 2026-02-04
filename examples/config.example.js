@@ -20,19 +20,41 @@
     // Optional: Test mode for simulating specific day/time
     // testMode: { day: 'Tuesday', time: '15:30' },
 
+    // Optional: Holiday definitions for exclusion
+    holidays: [
+      // US Federal Holidays (all 11)
+      { type: 'fixed', month: 1, day: 1, name: 'New Year\'s Day' },
+      { type: 'nthWeekday', month: 1, weekday: 1, nth: 3, name: 'Martin Luther King Jr. Day' },
+      { type: 'nthWeekday', month: 2, weekday: 1, nth: 3, name: 'Presidents\' Day' },
+      { type: 'nthWeekday', month: 5, weekday: 1, nth: -1, name: 'Memorial Day' },
+      { type: 'fixed', month: 6, day: 19, name: 'Juneteenth' },
+      { type: 'fixed', month: 7, day: 4, name: 'Independence Day' },
+      { type: 'nthWeekday', month: 9, weekday: 1, nth: 1, name: 'Labor Day' },
+      { type: 'nthWeekday', month: 10, weekday: 1, nth: 2, name: 'Columbus Day' },
+      { type: 'fixed', month: 11, day: 11, name: 'Veterans Day' },
+      { type: 'nthWeekday', month: 11, weekday: 4, nth: 4, name: 'Thanksgiving' },
+      { type: 'fixed', month: 12, day: 25, name: 'Christmas Day' },
+
+      // Optional: Add custom holidays
+      // { type: 'date', date: '2026-07-03', name: 'Independence Day (Observed)' },
+      // { type: 'fixed', month: 3, day: 2, name: 'Texas Independence Day' },
+    ],
+
     // Required: Array of reminder objects
     reminders: [
-      // Example 1: All-day reminder
+      // Example 1: All-day reminder with holiday exclusion
       {
         name: 'Trash Day',
         message: '🗑️ Remember to take out the trash tonight!',
         showOn: {
           day: 'Tuesday',
           allDay: true
-        }
+        },
+        excludeHolidays: true,  // Don't show if pickup is cancelled
+        eventDay: 'Wednesday'   // Actual pickup is Wednesday
       },
 
-      // Example 2: Time window reminder (cross-day)
+      // Example 2: Time window reminder with holiday exclusion (cross-day)
       {
         name: 'Street Cleaning',
         message: '🚧 Move your car for street cleaning',
@@ -45,10 +67,12 @@
             day: 'Thursday',
             time: '14:00' // 2:00 PM
           }
-        }
+        },
+        excludeHolidays: true,  // Don't show if cleaning is cancelled
+        eventDay: 'Thursday'    // Cleaning happens Thursday
       },
 
-      // Example 3: Same-day time window
+      // Example 3: Same-day time window (no holiday exclusion)
       {
         name: 'Lawn Care',
         message: '🌱 Good time to mow the lawn',
@@ -71,7 +95,9 @@
         showOn: {
           day: 'Friday',
           allDay: true
-        }
+        },
+        excludeHolidays: true,
+        eventDay: 'Saturday'  // Pickup is Saturday morning
       },
 
       // Example 5: Morning reminder

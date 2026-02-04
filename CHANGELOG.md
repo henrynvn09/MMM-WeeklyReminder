@@ -4,6 +4,33 @@ Notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-02-04
+
+### Added
+- Holiday exclusion system to suppress reminders when events occur on holidays
+- Support for three holiday types: fixed date, nth weekday, and specific date
+- `holidays` array configuration for defining holidays
+- `excludeHolidays` boolean field for reminders
+- `eventDay` field to specify which day the actual event occurs
+- Automatic event day detection (all-day = same day, time window = end day)
+- Holiday calculation engine with year-based caching
+- Support for "last occurrence" holidays using nth: -1 (e.g., Memorial Day)
+- Validation for holiday definitions with helpful warnings
+- US federal holidays template (11 holidays)
+- Holiday checking in isReminderActive() logic
+- Debug logging for holiday calculations and exclusions
+
+### Technical
+- `validateHolidayDefinition()` method for holiday validation
+- `calculateNthWeekday()` for calculating nth weekday of month
+- `calculateHolidaysForYear()` for generating annual holiday list
+- `getHolidaysForDate()` with year-based caching
+- `isHoliday()` for checking if a date is a holiday
+- `getEventDay()` for determining actual event day
+- `shouldExcludeForHoliday()` for exclusion logic
+- Holiday cache invalidation on year change
+- Week boundary and year boundary handling
+
 ## [2.0.0] - 2026-02-04
 
 ### Breaking Changes
