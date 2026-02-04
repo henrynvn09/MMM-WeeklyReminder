@@ -35,6 +35,148 @@ Module.register('MMM-WeeklyReminder', {
     }
 
     this.activeReminders = []
+
+    // Initial check
+    this.checkReminders()
+
+    // Set up periodic checking
+    this.schedulerInterval = setInterval(() => {
+      this.checkReminders()
+    }, this.config.updateInterval)
+  },
+
+  /**
+   * Called when module is hidden/removed
+   */
+  stop() {
+    if (this.schedulerInterval) {
+      clearInterval(this.schedulerInterval)
+    }
+  },
+
+  /**
+   * Checks all reminders and updates active reminder list
+   */
+  checkReminders() {
+    const newActiveReminders = []
+
+    for (const reminder of this.validReminders) {
+      if (this.isReminderActive(reminder)) {
+        newActiveReminders.push(reminder)
+      }
+    }
+
+    // Only update DOM if active reminders changed
+    if (this.hasRemindersChanged(newActiveReminders)) {
+      if (this.config.debug) {
+        Log.info(`[MMM-WeeklyReminder] Active reminders changed:`, newActiveReminders.map(r => r.name))
+      }
+      this.activeReminders = newActiveReminders
+      this.updateDom(this.config.animationSpeed)
+    }
+  },
+
+  /**
+   * Checks if reminder list has changed
+   * @param {Array} newReminders - New active reminders
+   * @returns {boolean} - True if changed
+   */
+  hasRemindersChanged(newReminders) {
+    if (newReminders.length !== this.activeReminders.length) {
+      return true
+    }
+
+    // Check if same reminders (by name)
+    const oldNames = this.activeReminders.map(r => r.name).sort()
+    const newNames = newReminders.map(r => r.name).sort()
+
+    return oldNames.join(',') !== newNames.join(',')
+  },
+
+  /**
+   * Determines if a reminder should be active right now
+   * @param {Object} reminder - Reminder configuration
+   * @returns {boolean} - True if currently active
+   */
+  isReminderActive(reminder) {
+    const now = new Date()
+    const currentDay = now.getDay() // 0=Sunday, 6=Saturday
+    const currentMinutes = now.getHours() * 60 + now.getMinutes()
+
+    if (reminder.showOn.allDay) {
+      // All day reminder - just check day
+      const reminderDay = this.dayNameToNumber(reminder.showOn.day)
+      return currentDay === reminderDay
+    }
+
+    // Start/end time window
+    const startDay = this.dayNameToNumber(reminder.showOn.start.day)
+    const endDay = this.dayNameToNumber(reminder.showOn.end.day)
+    const startMinutes = this.timeToMinutes(reminder.showOn.start.time)
+    const endMinutes = this.timeToMinutes(reminder.showOn.end.time)
+
+    return this.isInTimeWindow(currentDay, currentMinutes, startDay, startMinutes, endDay, endMinutes)
+  },
+
+  /**
+   * Checks if current time is within a reminder time window
+   * Handles same-day, cross-day, and multi-day spans
+   *
+   * @param {number} currentDay - Current day (0-6)
+   * @param {number} currentMinutes - Current minutes since midnight
+   * @param {number} startDay - Start day (0-6)
+   * @param {number} startMinutes - Start minutes since midnight
+   * @param {number} endDay - End day (0-6)
+   * @param {number} endMinutes - End minutes since midnight
+   * @returns {boolean} - True if currently in window
+   */
+  isInTimeWindow(currentDay, currentMinutes, startDay, startMinutes, endDay, endMinutes) {
+    if (startDay === endDay) {
+      // Same day window (e.g., Tuesday 09:00 - Tuesday 17:00)
+      if (currentDay !== startDay) {
+        return false
+      }
+
+      if (startMinutes <= endMinutes) {
+        // Normal same-day range
+        return currentMinutes >= startMinutes && currentMinutes < endMinutes
+      }
+      else {
+        // Crosses midnight (e.g., Tuesday 23:00 - Tuesday 01:00 means ALL day except 01:00-23:00)
+        return currentMinutes >= startMinutes || currentMinutes < endMinutes
+      }
+    }
+
+    // Multi-day span (e.g., Wednesday 18:00 - Thursday 14:00)
+    // Calculate day difference (handling week wrap-around)
+    let dayDiff = endDay - startDay
+    if (dayDiff < 0) {
+      dayDiff += 7
+    }
+
+    // Calculate current position in week relative to start
+    let currentDiff = currentDay - startDay
+    if (currentDiff < 0) {
+      currentDiff += 7
+    }
+
+    if (currentDiff < dayDiff) {
+      // Between start and end day
+      if (currentDiff === 0) {
+        // On start day - must be at or after start time
+        return currentMinutes >= startMinutes
+      }
+      else {
+        // On a middle day - always active
+        return true
+      }
+    }
+    else if (currentDiff === dayDiff) {
+      // On end day - must be before end time
+      return currentMinutes < endMinutes
+    }
+
+    return false
   },
 
   /**
