@@ -4,6 +4,48 @@ Notable changes to this project will be documented in this file.
 
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-02-04
+
+### Breaking Changes
+- Complete rewrite from MMM-CustomText to MMM-WeeklyReminder
+- Removed notification-based system (`CUSTOMTEXT_UPDATE`)
+- Removed `uniqueID` and `initialMessage` configuration options
+- Module name changed to `MMM-WeeklyReminder`
+- No backward compatibility with MMM-CustomText 1.x
+
+### Added
+- Automatic time-based scheduling for weekly reminders
+- Support for all-day reminders (entire day display)
+- Support for time-window reminders with flexible start/end times
+- Cross-day time spans (e.g., Wednesday 18:00 → Thursday 14:00)
+- Multiple simultaneous reminders with vertical stacking
+- HTML support in reminder messages (emojis, formatting, etc.)
+- Comprehensive validation with helpful warning messages
+- Debug mode for troubleshooting (`debug: true`)
+- Test mode for simulating specific days/times (`testMode`)
+- Automatic module hiding when no reminders are active
+- Suspend/resume support for hidden modules
+- Error handling to prevent scheduler crashes
+- Helper methods for day/time conversions
+
+### Configuration
+- New `reminders` array configuration with flexible formats
+- New `updateInterval` setting (default: 60 seconds)
+- New `timezone` setting for explicit timezone control
+- New `debug` setting for troubleshooting
+- New `testMode` setting for testing reminder schedules
+
+### Technical
+- Interval-based scheduler checks every 60 seconds (configurable)
+- Efficient change detection (only updates DOM when reminders change)
+- Week wrap-around support (Saturday → Sunday transitions)
+- Midnight crossing support for time windows
+- Multi-day span calculations with day offset logic
+
+---
+
+## Previous Versions (MMM-CustomText)
+
 ## [1.0.11](https://github.com/dathbe/MMM-CustomText/compare/1.0.10...v1.0.11) - 2026-01-04
 
 - Update automated-tests.yaml
