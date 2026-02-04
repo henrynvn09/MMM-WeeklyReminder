@@ -578,6 +578,73 @@ Module.register('MMM-WeeklyReminder', {
     return isHol
   },
 
+  /**
+   * Determines which day of week the actual event occurs
+   * @param {Object} reminder - Reminder configuration
+   * @returns {number} - Day of week (0=Sunday, 6=Saturday)
+   */
+  getEventDay(reminder) {
+    // If explicitly specified, use that
+    if (reminder.eventDay !== undefined) {
+      return this.dayNameToNumber(reminder.eventDay)
+    }
+
+    // Auto-detect based on showOn configuration
+    if (reminder.showOn.allDay) {
+      // All-day reminder - event day is the same day
+      return this.dayNameToNumber(reminder.showOn.day)
+    }
+
+    // Time window - event day is the end day
+    return this.dayNameToNumber(reminder.showOn.end.day)
+  },
+
+  /**
+   * Checks if a reminder should be excluded due to holiday
+   * @param {Object} reminder - Reminder configuration
+   * @returns {boolean} - True if should be suppressed
+   */
+  shouldExcludeForHoliday(reminder) {
+    // If holiday exclusion not enabled, don't exclude
+    if (!reminder.excludeHolidays) {
+      return false
+    }
+
+    // No holidays configured, can't exclude
+    if (!this.config.holidays || this.config.holidays.length === 0) {
+      return false
+    }
+
+    const now = this.getCurrentTime()
+    const eventDayOfWeek = this.getEventDay(reminder)
+
+    // Calculate the actual calendar date when the event occurs
+    // We need to find "the next occurrence of eventDayOfWeek"
+    const currentDayOfWeek = now.getDay()
+    let daysUntilEvent = eventDayOfWeek - currentDayOfWeek
+
+    // Handle week wrap-around
+    if (daysUntilEvent < 0) {
+      daysUntilEvent += 7
+    }
+
+    // Calculate event date
+    const eventDate = new Date(now)
+    eventDate.setDate(eventDate.getDate() + daysUntilEvent)
+    eventDate.setHours(0, 0, 0, 0) // Normalize to midnight for date comparison
+
+    // Check if event date is a holiday
+    const shouldExclude = this.isHoliday(eventDate)
+
+    if (this.config.debug) {
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+      const eventDateStr = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`
+      Log.info(`[MMM-WeeklyReminder] Reminder "${reminder.name}": event day is ${dayNames[eventDayOfWeek]} (${eventDateStr}), holiday exclusion: ${shouldExclude}`)
+    }
+
+    return shouldExclude
+  },
+
   // dom generator.
   getDom() {
     const wrapper = document.createElement('div')
