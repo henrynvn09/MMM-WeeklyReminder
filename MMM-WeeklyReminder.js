@@ -263,7 +263,25 @@ Module.register('MMM-WeeklyReminder', {
   // dom generator.
   getDom() {
     const wrapper = document.createElement('div')
-    wrapper.style.display = 'none'
+
+    // If no active reminders, return empty div (module will hide)
+    if (this.activeReminders.length === 0) {
+      wrapper.style.display = 'none'
+      return wrapper
+    }
+
+    wrapper.className = 'weekly-reminder-container'
+
+    // Create a reminder item for each active reminder
+    this.activeReminders.forEach(reminder => {
+      const reminderDiv = document.createElement('div')
+      reminderDiv.className = 'reminder-item'
+      reminderDiv.setAttribute('data-reminder-name', reminder.name)
+      reminderDiv.innerHTML = reminder.message // Allow HTML in messages
+
+      wrapper.appendChild(reminderDiv)
+    })
+
     return wrapper
   },
 
