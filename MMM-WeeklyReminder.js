@@ -379,6 +379,205 @@ Module.register('MMM-WeeklyReminder', {
     return hours * 60 + minutes
   },
 
+  /**
+   * Validates a holiday definition
+   * @param {Object} holiday - Holiday definition
+   * @returns {boolean} - True if valid
+   */
+  validateHolidayDefinition(holiday) {
+    if (!holiday || typeof holiday !== 'object') {
+      Log.warn(`[MMM-WeeklyReminder] Invalid holiday definition: not an object`)
+      return false
+    }
+
+    if (!holiday.type) {
+      Log.warn(`[MMM-WeeklyReminder] Holiday missing type field:`, holiday)
+      return false
+    }
+
+    if (!holiday.name || typeof holiday.name !== 'string') {
+      Log.warn(`[MMM-WeeklyReminder] Holiday missing or invalid name field:`, holiday)
+      return false
+    }
+
+    switch (holiday.type) {
+      case 'fixed':
+        // Requires month (1-12) and day (1-31)
+        if (typeof holiday.month !== 'number' || holiday.month < 1 || holiday.month > 12) {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has invalid month: ${holiday.month}`)
+          return false
+        }
+        if (typeof holiday.day !== 'number' || holiday.day < 1 || holiday.day > 31) {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has invalid day: ${holiday.day}`)
+          return false
+        }
+        return true
+
+      case 'nthWeekday':
+        // Requires month (1-12), weekday (0-6), nth (1-5 or -1 for last)
+        if (typeof holiday.month !== 'number' || holiday.month < 1 || holiday.month > 12) {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has invalid month: ${holiday.month}`)
+          return false
+        }
+        if (typeof holiday.weekday !== 'number' || holiday.weekday < 0 || holiday.weekday > 6) {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has invalid weekday: ${holiday.weekday}`)
+          return false
+        }
+        if (typeof holiday.nth !== 'number' || (holiday.nth < 1 && holiday.nth !== -1) || holiday.nth > 5) {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has invalid nth: ${holiday.nth}. Must be 1-5 or -1 for last.`)
+          return false
+        }
+        return true
+
+      case 'date':
+        // Requires date in YYYY-MM-DD format
+        if (!holiday.date || typeof holiday.date !== 'string') {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" missing or invalid date field`)
+          return false
+        }
+        const datePattern = /^\d{4}-\d{2}-\d{2}$/
+        if (!datePattern.test(holiday.date)) {
+          Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has invalid date format: ${holiday.date}. Use YYYY-MM-DD.`)
+          return false
+        }
+        return true
+
+      default:
+        Log.warn(`[MMM-WeeklyReminder] Holiday "${holiday.name}" has unknown type: ${holiday.type}`)
+        return false
+    }
+  },
+
+  /**
+   * Calculates the nth occurrence of a weekday in a given month
+   * @param {number} year - Year (e.g., 2026)
+   * @param {number} month - Month (1-12)
+   * @param {number} weekday - Day of week (0=Sunday, 6=Saturday)
+   * @param {number} nth - Which occurrence (1-5, or -1 for last)
+   * @returns {Date|null} - Date object or null if doesn't exist
+   */
+  calculateNthWeekday(year, month, weekday, nth) {
+    // Get first day of month
+    const firstDay = new Date(year, month - 1, 1)
+    const firstDayOfWeek = firstDay.getDay()
+
+    if (nth === -1) {
+      // Last occurrence - start from last day of month and work backwards
+      const lastDay = new Date(year, month, 0) // Day 0 = last day of previous month
+      const lastDayOfWeek = lastDay.getDay()
+      
+      let daysBack = (lastDayOfWeek - weekday + 7) % 7
+      const date = new Date(year, month, 0)
+      date.setDate(date.getDate() - daysBack)
+      
+      return date
+    }
+
+    // Calculate days until first occurrence of target weekday
+    let daysUntilWeekday = (weekday - firstDayOfWeek + 7) % 7
+    
+    // Calculate date of nth occurrence
+    const targetDate = 1 + daysUntilWeekday + (nth - 1) * 7
+    
+    // Check if date is valid for this month
+    const daysInMonth = new Date(year, month, 0).getDate()
+    if (targetDate > daysInMonth) {
+      return null // This nth occurrence doesn't exist
+    }
+    
+    return new Date(year, month - 1, targetDate)
+  },
+
+  /**
+   * Calculates all holidays for a given year
+   * @param {number} year - Year to calculate holidays for
+   * @returns {Array} - Array of { date: 'YYYY-MM-DD', name: string }
+   */
+  calculateHolidaysForYear(year) {
+    const holidays = []
+
+    for (const holidayDef of this.config.holidays) {
+      if (!this.validateHolidayDefinition(holidayDef)) {
+        continue // Skip invalid holidays
+      }
+
+      let holidayDate = null
+
+      switch (holidayDef.type) {
+        case 'fixed':
+          holidayDate = new Date(year, holidayDef.month - 1, holidayDef.day)
+          break
+
+        case 'nthWeekday':
+          holidayDate = this.calculateNthWeekday(year, holidayDef.month, holidayDef.weekday, holidayDef.nth)
+          if (!holidayDate) {
+            Log.warn(`[MMM-WeeklyReminder] Holiday "${holidayDef.name}" doesn't exist in ${year} (no ${holidayDef.nth}th occurrence)`)
+            continue
+          }
+          break
+
+        case 'date':
+          // Parse YYYY-MM-DD
+          const parts = holidayDef.date.split('-').map(Number)
+          if (parts[0] === year) {
+            holidayDate = new Date(parts[0], parts[1] - 1, parts[2])
+          }
+          // Skip if date is not for this year
+          break
+      }
+
+      if (holidayDate) {
+        // Format as YYYY-MM-DD
+        const dateStr = `${holidayDate.getFullYear()}-${String(holidayDate.getMonth() + 1).padStart(2, '0')}-${String(holidayDate.getDate()).padStart(2, '0')}`
+        holidays.push({ date: dateStr, name: holidayDef.name })
+      }
+    }
+
+    if (this.config.debug) {
+      Log.info(`[MMM-WeeklyReminder] Calculated ${holidays.length} holidays for ${year}:`, holidays)
+    }
+
+    return holidays
+  },
+
+  /**
+   * Gets holidays for a specific date (with caching)
+   * @param {Date} date - Date to check
+   * @returns {Array} - Array of holidays for the year
+   */
+  getHolidaysForDate(date) {
+    const year = date.getFullYear()
+
+    // Check if cache exists and is for current year
+    if (!this.holidayCache || this.holidayCache.year !== year) {
+      this.holidayCache = {
+        year: year,
+        holidays: this.calculateHolidaysForYear(year)
+      }
+    }
+
+    return this.holidayCache.holidays
+  },
+
+  /**
+   * Checks if a specific date is a holiday
+   * @param {Date} date - Date to check
+   * @returns {boolean} - True if date is a holiday
+   */
+  isHoliday(date) {
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+    const holidays = this.getHolidaysForDate(date)
+    
+    const isHol = holidays.some(h => h.date === dateStr)
+    
+    if (this.config.debug && isHol) {
+      const holiday = holidays.find(h => h.date === dateStr)
+      Log.info(`[MMM-WeeklyReminder] ${dateStr} is a holiday: ${holiday.name}`)
+    }
+    
+    return isHol
+  },
+
   // dom generator.
   getDom() {
     const wrapper = document.createElement('div')
