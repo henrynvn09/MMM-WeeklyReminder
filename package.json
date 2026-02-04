@@ -1,23 +1,31 @@
 {
-  "name": "mmm-customtext",
-  "version": "1.0.0",
+  "name": "mmm-weeklyreminder",
+  "version": "2.0.0",
   "type": "commonjs",
-  "description": "A MagicMirror² module to display a custom message on your mirror, updatable via notification.",
+  "description": "A MagicMirror² module to display custom weekly reminders based on day and time schedules.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dathbe/MMM-CustomText.git"
+    "url": "git+https://github.com/dathbe/MMM-WeeklyReminder.git"
   },
   "keywords": [
     "MagicMirror",
     "MagicMirror²",
     "Custom",
     "Text",
-    "Message"
+    "Message",
+    "Reminder",
+    "Weekly",
+    "Schedule",
+    "Recurring"
   ],
   "author": "dathbe",
   "contributors": [
-    {"name": "dathbe"},
-    {"name": "KristjanESPERANTO"}
+    {
+      "name": "dathbe"
+    },
+    {
+      "name": "KristjanESPERANTO"
+    }
   ],
   "scripts": {
     "lint": "eslint",

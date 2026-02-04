@@ -1,0 +1,12 @@
+.MMM-WeeklyReminder {
+	margin: 0;
+}
+
+.MMM-WeeklyReminder .weekly-reminder-container {
+	margin-bottom: var(--gap-modules);
+}
+
+.region.bottom .MMM-WeeklyReminder .weekly-reminder-container {
+	margin-top: var(--gap-modules);
+	margin-bottom: 0;
+}
