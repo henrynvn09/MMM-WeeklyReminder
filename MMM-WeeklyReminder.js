@@ -209,19 +209,35 @@ Module.register('MMM-WeeklyReminder', {
     const currentDay = now.getDay() // 0=Sunday, 6=Saturday
     const currentMinutes = now.getHours() * 60 + now.getMinutes()
 
+    // First check if we're in the time window
+    let inTimeWindow = false
+
     if (reminder.showOn.allDay) {
       // All day reminder - just check day
       const reminderDay = this.dayNameToNumber(reminder.showOn.day)
-      return currentDay === reminderDay
+      inTimeWindow = currentDay === reminderDay
+    }
+    else {
+      // Start/end time window
+      const startDay = this.dayNameToNumber(reminder.showOn.start.day)
+      const endDay = this.dayNameToNumber(reminder.showOn.end.day)
+      const startMinutes = this.timeToMinutes(reminder.showOn.start.time)
+      const endMinutes = this.timeToMinutes(reminder.showOn.end.time)
+
+      inTimeWindow = this.isInTimeWindow(currentDay, currentMinutes, startDay, startMinutes, endDay, endMinutes)
     }
 
-    // Start/end time window
-    const startDay = this.dayNameToNumber(reminder.showOn.start.day)
-    const endDay = this.dayNameToNumber(reminder.showOn.end.day)
-    const startMinutes = this.timeToMinutes(reminder.showOn.start.time)
-    const endMinutes = this.timeToMinutes(reminder.showOn.end.time)
+    // If not in time window, reminder is not active
+    if (!inTimeWindow) {
+      return false
+    }
 
-    return this.isInTimeWindow(currentDay, currentMinutes, startDay, startMinutes, endDay, endMinutes)
+    // Check if should be excluded due to holiday
+    if (this.shouldExcludeForHoliday(reminder)) {
+      return false
+    }
+
+    return true
   },
 
   /**
