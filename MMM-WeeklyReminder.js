@@ -13,6 +13,7 @@ Module.register('MMM-WeeklyReminder', {
     animationSpeed: 2 * 1000,  // DOM update animation speed
     timezone: null,            // null = use system timezone
     reminders: [],             // Array of reminder objects
+    holidays: [],              // Array of holiday definitions (fixed, nthWeekday, date)
     debug: false,              // Enable debug logging
     testMode: null,            // Test mode: { day: 'Tuesday', time: '15:30' }
   },
@@ -31,9 +32,13 @@ Module.register('MMM-WeeklyReminder', {
         updateInterval: this.config.updateInterval,
         timezone: this.config.timezone || 'system default',
         reminderCount: this.config.reminders.length,
+        holidayCount: this.config.holidays.length,
         testMode: this.config.testMode || 'disabled',
       })
     }
+
+    // Initialize holiday cache
+    this.holidayCache = null
 
     // Validate all reminders
     this.validReminders = this.config.reminders.filter(reminder => {
@@ -336,6 +341,19 @@ Module.register('MMM-WeeklyReminder', {
     if (!timePattern.test(reminder.showOn.end.time)) {
       Log.warn(`[MMM-WeeklyReminder] Reminder "${reminder.name}" has invalid end time format: ${reminder.showOn.end.time}. Use HH:MM format.`)
       return false
+    }
+
+    // Validate optional holiday exclusion fields
+    if (reminder.excludeHolidays !== undefined && typeof reminder.excludeHolidays !== 'boolean') {
+      Log.warn(`[MMM-WeeklyReminder] Reminder "${reminder.name}" has invalid excludeHolidays value. Must be boolean.`)
+      return false
+    }
+
+    if (reminder.eventDay !== undefined) {
+      if (!validDays.includes(reminder.eventDay)) {
+        Log.warn(`[MMM-WeeklyReminder] Reminder "${reminder.name}" has invalid eventDay: ${reminder.eventDay}`)
+        return false
+      }
     }
 
     return true
